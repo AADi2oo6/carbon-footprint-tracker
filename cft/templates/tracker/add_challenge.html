@@ -1,0 +1,35 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+
+{% block content %}
+<link href="{% static 'tracker/css/style.css' %}" rel="stylesheet">
+
+<div class="container" style="max-width: 800px; padding-top: 2rem; padding-bottom: 4rem;">
+    <section class="text-center mb-5">
+        <h1 class="section-title" style="font-size: 2.5rem;">Create a New Challenge</h1>
+        <p style="font-size: 1.1rem; color: #6B7280;">
+            Inspire your community by creating a new challenge for everyone to participate in.
+        </p>
+    </section>
+
+    <div class="engagement-card">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            
+            {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn-primary mt-3">Create Challenge</button>
+        </form>
+    </div>
+</div>
+{% endblock content %}

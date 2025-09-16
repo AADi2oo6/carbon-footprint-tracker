@@ -69,3 +69,38 @@ class UserAchievement(models.Model):
     def __str__(self):
         return f"{self.user.username} earned {self.achievement.name}"
 
+class Community(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    community_type = models.CharField(max_length=50, choices=[('University', 'University'), ('Company', 'Company'), ('City', 'City')])
+    members = models.ManyToManyField(User, related_name='communities', blank=True)
+
+    def __str__(self):
+        return self.name
+
+class Challenge(models.Model):
+    community = models.ForeignKey(Community, on_delete=models.CASCADE, related_name='challenges')
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    goal = models.FloatField(default=0)
+    unit = models.CharField(max_length=50, default='units', help_text="e.g., 'km', 'days', 'kg'")
+    reward_achievement = models.ForeignKey(Achievement, on_delete=models.SET_NULL, null=True, blank=True)
+    end_date = models.DateField()
+    participants = models.ManyToManyField(User, through='UserChallenge', related_name='challenges_joined')
+
+    def __str__(self):
+        return self.title
+
+# 7. UserChallenge Model (Tracks user progress in a challenge)
+class UserChallenge(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    challenge = models.ForeignKey(Challenge, on_delete=models.CASCADE)
+    progress = models.FloatField(default=0)
+    is_completed = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'challenge')
+
+    def __str__(self):
+        return f"{self.user.username} in {self.challenge.title}"

@@ -17,6 +17,13 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(template_name='tracker/logout.html'), name='logout'),
 
     path('myprofile/', views.myprofile, name='myprofile'),
-    path('logactivity/', views.logactivity),
+    path('activity/', views.activity, name='activity'),
+
+    path('community/', views.community_view, name='community'),
+    path('community/<int:pk>/', views.community_detail_view, name='community-detail'),
+    path('community/<int:pk>/join/', views.join_community, name='join-community'),
+    path('community/<int:pk>/leave/', views.leave_community, name='leave-community'),
+    path('challenges/', views.challenges_view, name='challenges'),
+    path('challenge/<int:pk>/join/', views.join_challenge, name='join-challenge'),
 
 ]

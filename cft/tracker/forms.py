@@ -5,7 +5,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.db import transaction
 from .models import Profile
-
+from .models import User, Profile, Challenge, Community
+from django.contrib.auth.forms import UserCreationForm
 
 class UserRegisterForm(UserCreationForm):
     first_name = forms.CharField(max_length=30, required=True)
@@ -68,3 +69,12 @@ class ProfileUpdateForm(forms.ModelForm):
         for field in self.fields:
             self.fields[field].widget.attrs.update({'class': 'form-control'})
 
+class ChallengeForm(forms.ModelForm):
+    end_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
+
+    class Meta:
+        model = Challenge
+        fields = ['community', 'title', 'description', 'goal', 'unit', 'reward_achievement', 'end_date']
+        help_texts = {
+            'reward_achievement': 'Optional. Select a badge to award upon completion.'
+        }
