@@ -1,0 +1,9 @@
+0000000000000000000000000000000000000000 6bae95b3ac87d317406eca88198fe662d3ce8d1a Aditya Sharma <adishahil346@gmail.com> 1756405004 +0530	clone: from https://github.com/AADi2oo6/carbon-footprint-tracker.git
+6bae95b3ac87d317406eca88198fe662d3ce8d1a 375781ed6c654556eabcfe20c0a06d2fe9fc1dfb Aditya Sharma <adishahil346@gmail.com> 1756407119 +0530	commit: setup of venv, and django project cretion done
+375781ed6c654556eabcfe20c0a06d2fe9fc1dfb 30768ca1215d6cc0a8109eddd73ef89e37c83268 Aditya Sharma <adishahil346@gmail.com> 1756411712 +0530	commit: frontend base created
+30768ca1215d6cc0a8109eddd73ef89e37c83268 9c14d03db7ea14a9929cf0f5e87b4df3d9d1e3ea Aditya Sharma <adishahil346@gmail.com> 1757092486 +0530	commit: dashboard wotk
+9c14d03db7ea14a9929cf0f5e87b4df3d9d1e3ea 5864397e4dbead5db2c8b78b91118132eafd537e Aditya Sharma <adishahil346@gmail.com> 1757193047 +0530	commit: UserProfile Completed (update and display)
+5864397e4dbead5db2c8b78b91118132eafd537e af53df1f9241473d122a35bbae9e30e77cdaff96 Aditya Sharma <adishahil346@gmail.com> 1757361868 +0530	commit: rank section added
+af53df1f9241473d122a35bbae9e30e77cdaff96 ff3ccb9be8db46969b577a8444c0d0b97325c418 Aditya Sharma <adishahil346@gmail.com> 1757368380 +0530	commit: Home Dashboard + nevbar Modefied
+ff3ccb9be8db46969b577a8444c0d0b97325c418 003ef630c0a95a0dba96e0e6fccc6c7aa2656da0 Aditya Sharma <adishahil346@gmail.com> 1757593016 +0530	commit: Index Bar added heat map added
+003ef630c0a95a0dba96e0e6fccc6c7aa2656da0 4ff5912ae49918e626991e5571e9af72d7261a38 Aditya Sharma <adishahil346@gmail.com> 1758008222 +0530	commit: real data

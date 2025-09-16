@@ -55,6 +55,41 @@
             display: none;
         }
     }
+    /* NEW: Styles for Recent Activity Log */
+    .recent-activity-section {
+        background-color: #ffffff;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    .recent-activity-section .section-title {
+        margin-bottom: 1.5rem;
+    }
+    .activity-log-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid #e9ecef;
+        transition: background-color 0.2s ease;
+    }
+    .activity-log-item:last-child {
+        border-bottom: none;
+    }
+    .activity-log-item:hover {
+        background-color: #f8f9fa;
+    }
+    .activity-log-icon {
+        font-size: 1.5rem;
+        width: 50px;
+        height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        margin-right: 1rem;
+    }
+    .activity-log-details { flex-grow: 1; }
+    .activity-log-impact { font-weight: 600; color: #343a40; }
 </style>
 
 <!-- NEW: Floating Page Navigation -->
@@ -63,6 +98,7 @@
         <li><a href="#hero-section" class="nav-link active">Welcome</a></li>
         {% if user.is_authenticated %}
         <li><a href="#personal-summary" class="nav-link">Your Impact</a></li>
+        <li><a href="#recent-activity" class="nav-link">Recent Logs</a></li>
         {% endif %}
         <li><a href="#annual-emissions-map" class="nav-link">Global Emissions</a></li>
         <li><a href="#global-stats" class="nav-link">Community Stats</a></li>
@@ -93,7 +129,7 @@
                         <div class="quote-author">- EcoTracker Team</div>
                     </div>
                     <div class="hero-actions">
-                        <a href="#" class="btn-primary">
+                        <a href="{% url 'activity' %}" class="btn-primary">
                             <i class="fas fa-plus"></i> Quick Log Activity
                         </a>
                         <a href="{% url 'myprofile' %}" class="btn-secondary">
@@ -110,26 +146,59 @@
             <div class="container">
                 <div class="summary-cards">
                     <div class="metric-card">
-                        <div class="metric-icon">📅</div>
+                        <div class="metric-icon" title="Your total carbon footprint this month."><i class="fas fa-leaf" style="color: #28a745;"></i></div>
                         <div class="metric-value">{{ summary_data.this_month }}</div>
                         <div class="metric-unit">tons CO2</div>
-                        <div class="metric-label">This Month</div>
+                        <div class="metric-label">Your Footprint (This Month)</div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-icon">📊</div>
+                        <div class="metric-icon" title="Comparison to last month's footprint."><i class="fas fa-chart-line" style="color: #17a2b8;"></i></div>
                         <div class="metric-value">{{ summary_data.last_month }}</div>
                         <div class="metric-unit">tons CO2</div>
-                        <div class="metric-label">Last Month</div>
+                        <div class="metric-label">vs. Last Month</div>
                     </div>
                     <div class="metric-card improvement">
-                        <div class="metric-icon">📈</div>
+                        <div class="metric-icon" title="Your percentage improvement from last month."><i class="fas fa-arrow-trend-down" style="color: #ffc107;"></i></div>
                         <div class="metric-value">↓ {{ summary_data.improvement }}%</div>
-                        <div class="metric-label">Improvement</div>
+                        <div class="metric-label">Monthly Improvement</div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-icon">🏆</div>
+                        <div class="metric-icon" title="Your rank in the community."><i class="fas fa-trophy" style="color: #6f42c1;"></i></div>
                         <div class="metric-value">#{{ summary_data.rank }}</div>
-                        <div class="metric-label">Your Rank</div>
+                        <div class="metric-label">Community Rank</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NEW: Recent Activity Log -->
+        <section id="recent-activity" class="recent-activity-section">
+            <div class="container">
+                <h2 class="section-title">Your Recent Activities</h2>
+                <div class="activity-log">
+                    <div class="activity-log-item">
+                        <div class="activity-log-icon" style="background-color: #eef7ff; color: #3B82F6;"><i class="fas fa-car"></i></div>
+                        <div class="activity-log-details">
+                            <strong>Travel: Car (Gasoline)</strong>
+                            <p class="text-muted mb-0">Logged a trip of 25 km.</p>
+                        </div>
+                        <div class="activity-log-impact">+5.8 kg CO₂e</div>
+                    </div>
+                    <div class="activity-log-item">
+                        <div class="activity-log-icon" style="background-color: #fffbeb; color: #F59E0B;"><i class="fas fa-bolt"></i></div>
+                        <div class="activity-log-details">
+                            <strong>Energy: Manual Entry</strong>
+                            <p class="text-muted mb-0">Logged 150 kWh of electricity usage.</p>
+                        </div>
+                        <div class="activity-log-impact">+64.5 kg CO₂e</div>
+                    </div>
+                    <div class="activity-log-item">
+                        <div class="activity-log-icon" style="background-color: #f0fdf4; color: #10B981;"><i class="fas fa-utensils"></i></div>
+                        <div class="activity-log-details">
+                            <strong>Food: Lunch (Red Meat)</strong>
+                            <p class="text-muted mb-0">Logged 1 serving.</p>
+                        </div>
+                        <div class="activity-log-impact">+2.5 kg CO₂e</div>
                     </div>
                 </div>
             </div>
@@ -290,15 +359,15 @@
                     <div class="engagement-card actions-card">
                         <h3>⚡ Quick Actions</h3>
                         <div class="quick-actions">
-                            <button class="action-btn">
+                            <a href="{% url 'activity' %}" class="action-btn">
                                 <i class="fas fa-plus"></i> Log Activity
-                            </button>
-                            <button class="action-btn">
+                            </a>
+                            <a href="{% url 'myprofile' %}" class="action-btn">
                                 <i class="fas fa-chart-line"></i> View Reports
-                            </button>
-                            <button class="action-btn">
+                            </a>
+                            <a href="#" class="action-btn">
                                 <i class="fas fa-target"></i> Set Goal
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -430,4 +499,3 @@
     });
 </script>
 {% endblock content %}
-

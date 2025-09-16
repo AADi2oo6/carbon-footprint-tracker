@@ -1,0 +1,151 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% load humanize %}
+{% load widget_tweaks %}
+
+{% block content %}
+<link href="{% static 'tracker/css/style.css' %}" rel="stylesheet">
+<style>
+    .progress {
+        height: 1.25rem;
+        font-size: 0.75rem;
+        border-radius: 0.5rem;
+    }
+    .progress-bar {
+        background-color: #10B981;
+    }
+    .metric-card .btn-small {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+</style>
+
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+    <section class="text-center mb-5">
+        <h1 class="section-title" style="font-size: 2.5rem;">Challenges</h1>
+        <p style="font-size: 1.1rem; color: #6B7280; max-width: 600px; margin: auto;">
+            Take on a challenge, track your progress, and make a real impact.
+        </p>
+    </section>
+
+    <!-- My Active Challenges -->
+    <section class="mb-5">
+        <h2 class="section-title-secondary">My Active Challenges</h2>
+        {% if joined_challenges %}
+            <div class="summary-cards">
+                {% for challenge in joined_challenges %}
+                    <div class="metric-card" style="text-align: left;">
+                        <h4 class="font-weight-bold mb-2">🎯 {{ challenge.title }}</h4>
+                        <p class="metric-label mb-2">{{ challenge.description|truncatewords:15 }}</p>
+                        <div class="progress mb-2">
+                            <div class="progress-bar" role="progressbar" style="width: {{ challenge.progress_percentage }}%;" aria-valuenow="{{ challenge.progress_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ challenge.user_progress|intcomma }}/{{ challenge.goal|intcomma }} {{ challenge.unit }}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center w-100 mt-auto">
+                            <small class="text-muted">From: <a href="{% url 'community-detail' pk=challenge.community.pk %}">{{ challenge.community.name }}</a></small>
+                            <span class="font-weight-bold" style="color: #374151;"><i class="fas fa-clock mr-1"></i>Ends: {{ challenge.end_date|date:"M d" }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="engagement-card">
+                <p class="text-muted text-center">You haven't joined any active challenges yet. Find one below!</p>
+            </div>
+        {% endif %}
+    </section>
+
+    <!-- Add Challenge Section (Collapsible) -->
+    <section class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="section-title-secondary mb-0">Explore Challenges</h2>
+            <a class="btn-primary" data-toggle="collapse" href="#addChallengeCollapse" role="button" aria-expanded="false" aria-controls="addChallengeCollapse">
+                <i class="fas fa-plus mr-2"></i>Create New Challenge
+            </a>
+        </div>
+        <div class="collapse" id="addChallengeCollapse">
+            <div class="engagement-card mb-4">
+                <h4 class="mb-4 text-center">Define a New Community Challenge</h4>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for field in challenge_form %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {% render_field field class="form-control" %}
+                        {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn-primary mt-3 w-100">Create Challenge</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Active Challenges -->
+    <section class="mb-5">
+        <div class="summary-cards">
+            {% for challenge in active_challenges %}
+            <div class="metric-card" style="text-align: left;">
+                <h4 class="font-weight-bold mb-2">🎯 {{ challenge.title }}</h4>
+                <p class="metric-label" style="min-height: 50px;">{{ challenge.description|truncatewords:15 }}</p>
+                <div class="d-flex justify-content-between text-muted mb-2">
+                    <span><strong>Goal:</strong> {{ challenge.goal|intcomma }} {{ challenge.unit }}</span>
+                    {% if challenge.reward_achievement %}
+                    <span><strong>Reward:</strong> <i class="{{ challenge.reward_achievement.icon }}"></i></span>
+                    {% endif %}
+                </div>
+                <small class="text-muted d-block mb-3">From: <a href="{% url 'community-detail' pk=challenge.community.pk %}">{{ challenge.community.name }}</a></small>
+                <div class="d-flex justify-content-between align-items-center w-100 mt-auto">
+                    <span class="font-weight-bold" style="color: #374151;"><i class="fas fa-clock mr-2"></i>Ends: {{ challenge.end_date|date:"M d" }}</span>
+                    {% if challenge.is_joined %}
+                        <button class="btn btn-success btn-small" disabled>
+                            {% if challenge.is_completed %}Completed ✅{% else %}Joined{% endif %}
+                        </button>
+                    {% else %}
+                        <form action="{% url 'join-challenge' pk=challenge.pk %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-primary btn-small">Join</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="engagement-card w-100">
+                <p class="text-center text-muted mb-0">No active challenges at the moment. Check back soon!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Completed Challenges -->
+    <section>
+        <h2 class="section-title-secondary">Completed Challenges</h2>
+        <div class="col-lg-11 mx-auto">
+            {% for challenge in completed_challenges %}
+            <div class="engagement-card mb-3 opacity-75">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">🏁 {{ challenge.title }}</h5>
+                        <small class="text-muted">From: <a href="{% url 'community-detail' pk=challenge.community.pk %}">{{ challenge.community.name }}</a></small>
+                    </div>
+                    <small class="text-muted font-weight-bold">Ended: {{ challenge.end_date|date:"F d, Y" }}</small>
+                </div>
+            </div>
+            {% empty %}
+            <div class="engagement-card text-center">
+                <p class="text-muted mb-0">No challenges have been completed yet.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock content %}
