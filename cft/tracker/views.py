@@ -9,6 +9,8 @@ from .models import Profile, Activity, Emission, Community, Challenge, UserChall
 import json
 from datetime import date, timedelta
 import random
+from .map_assets.map_generator import generate_india_heatmap_from_profiles
+
  
 
 # --- (register view remains the same) ---
@@ -159,6 +161,14 @@ def home(request):
     # --- REAL LEADERBOARD & RANK ---
     leaderboard, user_rank,_ = get_leaderboard_and_rank(request.user if request.user.is_authenticated else None)
 
+     # --- NEW: GENERATE THE HEATMAP ---
+    # 1. Get all user profiles that have a location defined
+    all_profiles_with_location = Profile.objects.filter(location__isnull=False).exclude(location__exact='')
+    # 2. Call the map generator function with the profile data
+    india_map_html = generate_india_heatmap_from_profiles(all_profiles_with_location)
+    # --- END OF NEW LOGIC ---
+
+
     context = {
         'global_stats': {'totalUsers': total_users, 'co2Saved': 847, 'countriesCount': 67},
         'country_comparison': country_comparison,
@@ -172,7 +182,8 @@ def home(request):
             'tip': {'icon': '💡', 'title': "Today's Eco Tip", 'content': 'Replace 1 car trip with biking today', 'impact': 'Potential save: 2.3kg CO2'},
             'weather': {'icon': '☀️', 'title': "Weather Advice", 'content': 'Perfect day for cycling!', 'impact': 'Air quality: Good'},
             'events': {'icon': '🌱', 'title': "Local Events", 'content': 'Tree planting drive this Saturday', 'impact': 'Green Park 10AM'},
-        }
+        },
+        'india_map_html': india_map_html, 
     }
     return render(request, 'tracker/home.html', context)
 
