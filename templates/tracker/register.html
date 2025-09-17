@@ -1,0 +1,67 @@
+{% extends "tracker/auth_base.html" %}
+{% load static %}
+
+{% block form_content %}
+<h2 class="text-center mb-4">Create Your Account</h2>
+<p class="text-center text-muted mb-4">Join our community and start tracking your impact today.</p>
+
+<form method="POST">
+    {% csrf_token %}
+    <fieldset class="form-group">
+        <!-- Display non-field errors (e.g., "Passwords don't match") -->
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger pb-0">
+                {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Display First Name and Last Name side-by-side -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                {{ form.first_name.label_tag }}
+                {{ form.first_name }}
+                {% if form.first_name.errors %}<small class="text-danger">{{ form.first_name.errors.as_text }}</small>{% endif %}
+            </div>
+            <div class="form-group col-md-6">
+                {{ form.last_name.label_tag }}
+                {{ form.last_name }}
+                {% if form.last_name.errors %}<small class="text-danger">{{ form.last_name.errors.as_text }}</small>{% endif %}
+            </div>
+        </div>
+
+        <!-- Display Username and Email -->
+        <div class="form-group">
+            {{ form.username.label_tag }}
+            {{ form.username }}
+            {% if form.username.errors %}<small class="text-danger">{{ form.username.errors.as_text }}</small>{% endif %}
+        </div>
+        <div class="form-group">
+            {{ form.email.label_tag }}
+            {{ form.email }}
+            {% if form.email.errors %}<small class="text-danger">{{ form.email.errors.as_text }}</small>{% endif %}
+        </div>
+
+        <!-- Display Password Fields -->
+        <div class="form-group">
+            {{ form.password1.label_tag }}
+            {{ form.password1 }}
+            {% if form.password1.errors %}<small class="text-danger">{{ form.password1.errors.as_text }}</small>{% endif %}
+        </div>
+        <div class="form-group">
+            {{ form.password2.label_tag }}
+            {{ form.password2 }}
+            {% if form.password2.errors %}<small class="text-danger">{{ form.password2.errors.as_text }}</small>{% endif %}
+        </div>
+
+    </fieldset>
+    <div class="form-group">
+        <button class="btn btn-lg btn-success btn-block" type="submit">Create Account</button>
+    </div>
+</form>
+
+<div class="text-center mt-3">
+    <small class="text-muted">Already have an account? <a href="{% url 'login' %}">Log In</a></small>
+</div>
+{% endblock form_content %}

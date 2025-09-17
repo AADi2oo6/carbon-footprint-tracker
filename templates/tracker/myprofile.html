@@ -1,0 +1,427 @@
+{% extends "tracker/base.html" %}
+{% block content %}
+<!-- Chart.js library for creating interactive charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    .stat-card {
+        background-color: #ffffff;
+        border: none;
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .chart-container {
+        position: relative;
+        height: 350px;
+        width: 100%;
+    }
+    .progress {
+        height: 1.5rem;
+        border-radius: 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .list-group-item {
+        border-left: 4px solid transparent;
+        padding: 0.75rem 1.25rem;
+    }
+    .list-group-item-action:hover {
+        border-left-color: #28a745;
+    }
+    .achievement-icon {
+        font-size: 1.5rem;
+        color: #ffc107;
+    }
+    /* Styles for the streak calendar */
+    .streak-container { display: flex; flex-direction: column; }
+    .streak-grid { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; gap: 4px; margin-bottom: 5px; }
+    .streak-day { width: 100%; aspect-ratio: 1 / 1; background-color: #ebedf0; border-radius: 3px; }
+    .streak-day.active { background-color: #28a745; }
+    .streak-months { display: flex; font-size: 0.75rem; color: #6c757d; }
+    .streak-months div { text-align: center; }
+    .streak-stats { font-size: 0.9rem; color: #495057; }
+
+    /* Styles for Profile Card */
+    .profile-card {
+        padding: 2rem;
+        text-align: center;
+    }
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        margin: 0 auto 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #e9ecef;
+        color: #495057;
+        font-size: 3rem;
+        border: 4px solid #fff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .profile-info-list {
+        list-style: none;
+        padding: 0;
+        text-align: left;
+        margin-top: 1.5rem;
+        margin-bottom: 0;
+    }
+    .profile-info-list li {
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+    }
+    .profile-info-list .fas {
+        width: 25px;
+        text-align: center;
+        margin-right: 10px;
+        color: #28a745;
+    }
+    .icon.bg-success-light {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+     .icon.bg-info-light {
+        background-color: rgba(23, 162, 184, 0.1);
+        color: #17a2b8;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .flex-row {
+        display: flex;
+        flex-direction: row !important;
+    }
+    .card-body.flex-column {
+        display: flex;
+        flex-direction: column;
+    }
+    /* NEW: Styles for Ranking Card */
+    .rank-display {
+        display: none;
+    }
+    .rank-display.active {
+        display: block;
+    }
+
+</style>
+
+<div class="row">
+    <!-- Left Column for Profile Information -->
+    <div class="col-lg-4 mb-4">
+        <!-- Profile Card -->
+        <div class="card stat-card profile-card mb-4">
+            <div class="profile-avatar">
+                <i class="fas fa-leaf"></i>
+            </div>
+            <h4 class="font-weight-bold mb-0">{{ user.get_full_name|default:user.username }}</h4>
+            <p class="text-muted">@{{ user.username }}</p>
+            
+            <button class="btn btn-success btn-block" data-toggle="modal" data-target="#profileEditModal">
+                <i class="fas fa-pencil-alt"></i> Edit Profile
+            </button>
+
+            <ul class="profile-info-list">
+                <li><i class="fas fa-envelope"></i> {{ user.email }}</li>
+                <li><i class="fas fa-phone"></i> {{ user.profile.phone_number|default:"Not provided" }}</li>
+                <li><i class="fas fa-map-marker-alt"></i> {{ user.profile.location|default:"Not provided" }}</li>
+            </ul>
+        </div>
+
+        <!-- Carbon Budget Card (Moved to Left) -->
+        <div class="card stat-card mb-4">
+            <div class="card-body flex-column">
+                <h5 class="card-title w-100">Monthly Carbon Budget</h5>
+                <p>You have used <strong>{{ carbon_budget.used }} kg</strong> of your <strong>{{ carbon_budget.limit }} kg</strong> allowance.</p>
+                <div class="progress w-100">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ carbon_budget.percentage }}%;" aria-valuenow="{{ carbon_budget.percentage }}" aria-valuemin="0" aria-valuemax="100">{{ carbon_budget.percentage }}%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actionable Insights Card (Moved to Left) -->
+        <div class="card stat-card mb-4">
+            <div class="card-body flex-column">
+                <h5 class="card-title w-100 mb-3"><i class="fas fa-rocket text-success"></i> Actionable Insights</h5>
+                <div class="list-group list-group-flush w-100">
+                    {% for insight in actionable_insights %}
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <i class="{{ insight.icon }} text-success mr-2"></i> {{ insight.text }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Achievements Card (Moved to Left) -->
+        <div class="card stat-card mb-4">
+            <div class="card-body flex-column">
+                <h5 class="card-title w-100 mb-3"><i class="fas fa-trophy text-warning"></i> Achievements</h5>
+                <div class="list-group list-group-flush w-100">
+                    {% for achievement in global_achievements %}
+                        <div class="list-group-item d-flex align-items-center">
+                             <i class="{{ achievement.icon }} achievement-icon mr-3"></i>
+                            <div>
+                                <strong>{{ achievement.name }}</strong>
+                                <small class="d-block text-muted">{{ achievement.description }}</small>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column for Dashboard -->
+    <div class="col-lg-8">
+        <!-- Page Header -->
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+            <h1 class="h2">Your Dashboard</h1>
+            <a href="{% url 'activity' %}" class="btn btn-sm btn-success">
+                <i class="fas fa-plus-circle"></i> Log New Activity
+            </a>
+        </div>
+
+        <!-- Stat Cards Row -->
+        <div class="row">
+            <!-- Monthly Footprint Stat Card -->
+            <div class="col-md-6 mb-4">
+                <div class="card stat-card h-100">
+                    <div class="card-body flex-row align-items-center">
+                        <div class="icon bg-success-light mr-3"><i class="fas fa-tree"></i></div>
+                        <div>
+                            <h5 class="card-title mb-1">Monthly Footprint</h5>
+                            <p class="card-text h3 font-weight-bold">{{ total_footprint_this_month }} kg CO₂e</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- NEW: Monthly Ranking Card -->
+            <div class="col-md-6 mb-4">
+                <div class="card stat-card h-100">
+                    <div class="card-body flex-column align-items-start">
+                         <div class="d-flex justify-content-between w-100">
+                            <h5 class="card-title mb-1">Monthly Ranking</h5>
+                            <select id="rank-selector" class="form-control form-control-sm w-auto">
+                                <option value="city" selected>City</option>
+                                <option value="state">State</option>
+                                <option value="country">Country</option>
+                            </select>
+                        </div>
+                        <div id="rank-city" class="rank-display active mt-2">
+                             <p class="card-text h3 font-weight-bold">#{{ ranking_data.city.rank }} <span class="h6 text-muted">/ {{ ranking_data.city.total }}</span></p>
+                        </div>
+                        <div id="rank-state" class="rank-display mt-2">
+                            <p class="card-text h3 font-weight-bold">#{{ ranking_data.state.rank }} <span class="h6 text-muted">/ {{ ranking_data.state.total }}</span></p>
+                        </div>
+                        <div id="rank-country" class="rank-display mt-2">
+                             <p class="card-text h3 font-weight-bold">#{{ ranking_data.country.rank }} <span class="h6 text-muted">/ {{ ranking_data.country.total }}</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Activity Streak Card -->
+        <div class="card stat-card mb-4">
+            <div class="card-body flex-column align-items-start">
+                <h5 class="card-title">Activity Streak</h5>
+                <p class="streak-stats w-100">
+                    <strong>Total Active Days:</strong> <span id="total-active-days"></span> | 
+                    <strong>Max Streak:</strong> <span id="max-streak"></span>
+                </p>
+                <div class="streak-container w-100">
+                    <div class="streak-grid" id="streak-grid"></div>
+                    <div class="streak-months" id="streak-months"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trends Over Time Chart -->
+        <div class="card stat-card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Footprint Trend (Last 6 Months)</h5>
+                <div class="chart-container">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+         <!-- Category Breakdown Chart -->
+        <div class="card stat-card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Breakdown by Category</h5>
+                <div class="chart-container" style="height: 300px;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Profile Edit Modal -->
+<div class="modal fade" id="profileEditModal" tabindex="-1" role="dialog" aria-labelledby="profileEditModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="profileEditModalLabel">Edit Your Profile</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form method="POST">
+            {% csrf_token %}
+            <fieldset class="form-group">
+                <legend class="border-bottom pb-2 mb-3">User Info</legend>
+                {{ u_form.as_p }}
+            </fieldset>
+            <fieldset class="form-group">
+                <legend class="border-bottom pb-2 mb-3">Profile Info</legend>
+                {{ p_form.as_p }}
+            </fieldset>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-success">Save Changes</button>
+      </div>
+        </form>
+    </div>
+  </div>
+</div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Data passed from the Django view
+        const categoryData = JSON.parse('{{ category_data_json|safe }}');
+        const trendsData = JSON.parse('{{ trends_data_json|safe }}');
+        const streakData = JSON.parse('{{ streak_data_json|safe }}');
+
+        // --- NEW: Rank Selector Logic ---
+        const rankSelector = document.getElementById('rank-selector');
+        if (rankSelector) {
+            rankSelector.addEventListener('change', function() {
+                document.querySelectorAll('.rank-display').forEach(el => el.classList.remove('active'));
+                const selectedRank = document.getElementById('rank-' + this.value);
+                if (selectedRank) {
+                    selectedRank.classList.add('active');
+                }
+            });
+        }
+
+        // 1. Trends Line Chart (Last 6 Months)
+        const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+        if (trendsCtx) {
+            new Chart(trendsCtx, {
+                type: 'line',
+                data: {
+                    labels: trendsData.labels,
+                    datasets: [{
+                        label: 'kg CO₂e',
+                        data: trendsData.data,
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderColor: '#28a745',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: false } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // 2. Category Breakdown Doughnut Chart
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        if (categoryCtx) {
+            new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryData.labels,
+                    datasets: [{
+                        label: 'Footprint Breakdown',
+                        data: categoryData.data,
+                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545'],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                }
+            });
+        }
+        
+        // 3. Activity Streak Diagram
+        const streakGrid = document.getElementById('streak-grid');
+        const streakMonthsContainer = document.getElementById('streak-months');
+        const totalActiveDaysSpan = document.getElementById('total-active-days');
+        const maxStreakSpan = document.getElementById('max-streak');
+
+        if (streakGrid) {
+            totalActiveDaysSpan.textContent = streakData.total_active;
+            maxStreakSpan.textContent = streakData.max_streak;
+
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - 139); // Show last ~20 weeks
+
+            const activeDays = new Set(streakData.active_days);
+            let monthLabels = {};
+            
+            streakGrid.innerHTML = ''; 
+            streakMonthsContainer.innerHTML = '';
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const dayElement = document.createElement('div');
+                dayElement.classList.add('streak-day');
+                
+                const dateString = d.toISOString().split('T')[0];
+                if (activeDays.has(dateString)) {
+                    dayElement.classList.add('active');
+                }
+                
+                dayElement.title = d.toDateString();
+                streakGrid.appendChild(dayElement);
+
+                const month = d.toLocaleString('default', { month: 'short' });
+                if (!monthLabels[month]) {
+                    monthLabels[month] = 0;
+                }
+                monthLabels[month]++;
+            }
+
+            let totalDays = 0;
+            for (const count of Object.values(monthLabels)) { totalDays += count; }
+            
+            for (const [month, count] of Object.entries(monthLabels)) {
+                 const monthEl = document.createElement('div');
+                 monthEl.textContent = month;
+                 monthEl.style.width = `${(count / totalDays) * 100}%`;
+                 streakMonthsContainer.appendChild(monthEl);
+            }
+        }
+    });
+</script>
+{% endblock content %}

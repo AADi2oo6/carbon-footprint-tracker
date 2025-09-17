@@ -1,0 +1,135 @@
+<!-- templates/tracker/auth_base.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://bootswatch.com/4/lux/bootstrap.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <title>{% block title %}{% endblock %} - Carbon Footprint Tracker</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f7f6;
+        }
+        .auth-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .auth-image-side {
+            flex: 1;
+            background: url("{% static 'tracker/images/auth-bg.jpg' %}") no-repeat center center / cover;
+
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+        .auth-image-side::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(19, 87, 39, 0.6); /* Dark green overlay */
+            z-index: 1;
+        }
+        .image-content {
+            position: relative;
+            z-index: 2;
+        }
+        .image-content h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+        }
+        .image-content p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .auth-form-side {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        .form-wrapper {
+            width: 100%;
+            max-width: 450px;
+        }
+        .form-wrapper .logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #28a745;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .form-wrapper .logo i {
+            margin-right: 0.5rem;
+        }
+        .form-wrapper h2 {
+            margin-bottom: 2rem;
+            text-align: center;
+            font-weight: 600;
+        }
+        .form-control {
+            border-radius: 0.5rem;
+            padding: 1.5rem 1rem;
+        }
+        .btn-submit {
+            background-color: #28a745;
+            border-color: #28a745;
+            font-weight: 600;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+        .alt-action-link {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+        @media (max-width: 768px) {
+            .auth-image-side {
+                display: none;
+            }
+            .auth-form-side {
+                flex-basis: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-image-side">
+            <div class="image-content">
+                <h1>Track Your Impact</h1>
+                <p>Join our community to build a sustainable future, one step at a time.</p>
+            </div>
+        </div>
+        <div class="auth-form-side">
+            <div class="form-wrapper">
+                <div class="logo">
+                    <i class="fas fa-leaf"></i> Carbon Tracker
+                </div>
+                <!-- The form content from login/register will go here -->
+                {% block form_content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!-- templates/tracker/logout.html -->
+{% extends "tracker/auth_base.html" %}
+
+{% block title %}Logged Out{% endblock %}
+
+{% block form_content %}
+    <div class="text-center">
+        <h2 class="mb-4">You have been logged out.</h2>
+        <p class="text-muted">Thank you for helping us build a more sustainable world. Come back soon!</p>
+        <div class="mt-4">
+            <a href="{% url 'login' %}" class="btn btn-success btn-submit">Log In Again</a>
+        </div>
+    </div>
+{% endblock form_content %}

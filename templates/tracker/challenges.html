@@ -1,0 +1,229 @@
+{% extends "tracker/base.html" %}
+{% load static %}
+{% load mathfilters %}
+
+{% block content %}
+<link href="{% static 'tracker/css/style.css' %}" rel="stylesheet">
+
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+    <section class="text-center mb-5">
+        <h1 class="section-title" style="font-size: 2.5rem;">Challenges</h1>
+        <p style="font-size: 1.1rem; color: #6B7280; max-width: 600px; margin: auto;">
+            Join forces with like-minded individuals to amplify your impact and take on challenges together.
+        </p>
+    </section>
+
+    <div class="row">
+        <!-- Main Content: All Challenges -->
+        <div class="col-lg-8">
+            <div id="explore-challenges" class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="section-title-secondary mb-0">Explore Challenges</h2>
+                <!-- Filters/Sorting Dropdown -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-filter mr-1"></i> Sort By
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+                        <a class="dropdown-item {% if current_sort == 'difficulty' %}active{% endif %}" href="?sort=difficulty">Difficulty</a>
+                        <a class="dropdown-item {% if current_sort == 'duration' %}active{% endif %}" href="?sort=duration">Duration</a>
+                        <a class="dropdown-item {% if current_sort == 'impact' %}active{% endif %}" href="?sort=impact">Impact</a>
+                    </div>
+                </div>
+                <div class="ml-auto">
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#createChallengeModal"><i class="fas fa-plus mr-2"></i>Create New Challenge</button>
+                </div>
+            </div>
+
+            {% for challenge in all_challenges %}
+            <div class="engagement-card mb-3 challenge-card-animated" style="animation-delay: {{ forloop.counter0|mul:100 }}ms;">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="font-weight-bold mb-1">{{ challenge.title }}</h4>
+                        <p class="text-muted mb-2">{{ challenge.description }}</p>
+                        <span class="font-weight-bold" style="color: #374151;"><i class="fas fa-users mr-2"></i>{{ challenge.participant_count }} Joined</span>
+                    </div>
+                    <div class="col-md-4 text-md-right mt-3 mt-md-0">
+                        {% if challenge.id in user_challenge_ids %}
+                            <form action="{% url 'leave-challenge' pk=challenge.pk %}" method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger">Leave</button>
+                            </form>
+                        {% else %}
+                            <form action="{% url 'join-challenge' pk=challenge.pk %}" method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success">Join</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <!-- Placeholder Challenge Card 1 -->
+            <div class="engagement-card mb-3 opacity-50">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="font-weight-bold mb-1">Go Car-Free for a Week</h4>
+                        <p class="text-muted mb-2">Rely on public transport, cycling, or walking for all your travel needs for one full week.</p>
+                        <div class="progress mt-1" style="height: 10px; max-width: 200px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-right mt-3 mt-md-0">
+                        <button type="button" class="btn btn-success" disabled>Join</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Placeholder Challenge Card 2 -->
+            <div class="engagement-card mb-3 opacity-50">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="font-weight-bold mb-1">Reduce Electricity by 10%</h4>
+                        <p class="text-muted mb-2">Cut down your monthly electricity usage by 10% through smart habits and energy-efficient practices.</p>
+                        <div class="progress mt-1" style="height: 10px; max-width: 200px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-right mt-3 mt-md-0">
+                        <button type="button" class="btn btn-success" disabled>Join</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Community Leaderboard Section -->
+            <div class="engagement-card mt-5">
+                <h3 class="section-title-secondary border-bottom pb-2 mb-3">Leaderboard</h3>
+                <table class="table table-borderless">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>User / Community</th>
+                            <th>Carbon Reduction (kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in leaderboard_data %}
+                        <tr>
+                            <td class="font-weight-bold">{{ item.rank }}</td>
+                            <td>
+                                <i class="fas {% if item.is_group %}fa-users{% else %}fa-user{% endif %} mr-2 text-success"></i> {{ item.name }}
+                            </td>
+                            <td>{{ item.reduction }} kg</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sidebar: My Challenges -->
+        <div class="col-lg-4">
+            <div class="engagement-card" style="position: sticky; top: 100px;">
+                <!-- Progress Summary Widget -->
+                <div class="text-center border-bottom pb-3 mb-3">
+                    <h5 class="section-title-secondary mb-1">Your Challenge Impact</h5>
+                    <p class="h2 font-weight-bold text-success mb-1">{{ total_impact }} kg</p>
+                    <p class="text-muted mb-0 small">Total Carbon Saved</p>
+                </div>
+
+                <h3 class="section-title-secondary border-bottom pb-2 mb-3">My Challenges</h3>
+                {% if my_challenges %}
+                <div class="my-challenges-list">
+                    {% for user_challenge in my_challenges %}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>{{ user_challenge.challenge.title }}</strong>
+                            {% if user_challenge.is_completed %}
+                                <span class="badge badge-success">Completed</span>
+                            {% elif user_challenge.progress >= 100 %}
+                                <form action="{% url 'complete-challenge' pk=user_challenge.pk %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-info">Complete</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                        <div class="progress mt-1" style="height: 10px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success animated-progress" role="progressbar"
+                                 style="width: 0%; transition: width 1.5s ease-out;" 
+                                 data-final-width="{{ user_challenge.progress }}%"
+                                 aria-valuenow="{{ user_challenge.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">You haven't joined any challenges yet. <a href="#explore-challenges">Explore challenges to get started!</a></p>
+                {% endif %}
+
+                <h3 class="section-title-secondary border-bottom pb-2 mt-4 mb-3">My Achievements</h3>
+                <div class="d-flex flex-wrap">
+                    {% for ach in earned_achievements %}
+                    <i class="fas {{ ach.icon }} fa-2x p-2 text-warning" title="{{ ach.name }} - {{ ach.description }}"></i>
+                    {% endfor %}
+                </div>
+                <!-- Encouragement Placeholder -->
+                <div class="mt-3 p-3" style="background-color: #f0fdf4; border-left: 4px solid #10b981; border-radius: 4px;">
+                    <p class="mb-1 font-weight-bold" style="color: #059669;">Unlock More Badges!</p>
+                    <p class="small text-muted mb-0">
+                        Log your activities and complete challenges to reduce your carbon footprint and earn new achievements.
+                        <a href="#explore-challenges">Join a challenge!</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Challenge Modal -->
+<div class="modal fade" id="createChallengeModal" tabindex="-1" role="dialog" aria-labelledby="createChallengeModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createChallengeModalLabel">Create a New Challenge</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form action="{% url 'challenges' %}" method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn btn-success btn-block">Create Challenge</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips for achievements
+    $('[data-toggle="tooltip"]').tooltip();
+
+    // Smooth scroll for the "Explore challenges" link
+    $('a[href="#explore-challenges"]').on('click', function(e) { e.preventDefault(); document.querySelector('#explore-challenges').scrollIntoView({ behavior: 'smooth' }); });
+
+    // --- NEW: Animate Progress Bars on Scroll ---
+    const progressBars = document.querySelectorAll('.animated-progress');
+
+    const observerOptions = {
+        root: null, // Use the viewport as the root
+        rootMargin: '0px',
+        threshold: 0.5 // Trigger when 50% of the element is visible
+    };
+
+    const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const bar = entry.target;
+                const finalWidth = bar.getAttribute('data-final-width');
+                bar.style.width = finalWidth;
+                observer.unobserve(bar); // Stop observing once animated
+            }
+        });
+    }, observerOptions);
+
+    progressBars.forEach(bar => observer.observe(bar));
+});
+</script>
+{% endblock %}

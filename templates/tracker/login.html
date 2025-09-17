@@ -1,0 +1,27 @@
+<!-- templates/tracker/login.html -->
+{% extends "tracker/auth_base.html" %}
+
+{% block title %}Log In{% endblock %}
+
+{% block form_content %}
+    <h2>Welcome Back!</h2>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            {{ form.username.label_tag }}
+            {{ form.username }}
+        </div>
+        <div class="form-group">
+            {{ form.password.label_tag }}
+            {{ form.password }}
+        </div>
+        <div class="form-group">
+            <button class="btn btn-primary btn-submit" type="submit">Login</button>
+        </div>
+    </form>
+    <div class="alt-action-link">
+        <small class="text-muted">
+            Need An Account? <a href="{% url 'register' %}">Sign Up Now</a>
+        </small>
+    </div>
+{% endblock form_content %}
