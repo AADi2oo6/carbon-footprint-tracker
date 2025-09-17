@@ -9,6 +9,9 @@ from .models import Profile, Activity, Emission, Community, Challenge, UserChall
 import json
 from datetime import date, timedelta
 import random
+from .map_assets.map_generator import generate_india_heatmap_from_profiles
+
+ 
 
 # --- (register view remains the same) ---
 def register(request):
@@ -34,14 +37,14 @@ def get_leaderboard_and_rank(current_user=None):
             activity__user=user,
             activity__timestamp__gte=thirty_days_ago
         ).aggregate(total=Sum('co2_equivalent_kg'))
-        
+
         total_emissions = emissions['total'] or 0
         leaderboard_data.append({
             'user_id': user.id,
             'username': user.username,
             'emission': total_emissions,
         })
-    
+
     # Sort by emissions (lowest first), users with 0 at the end
     leaderboard_data.sort(key=lambda x: (x['emission'] == 0, x['emission']))
 
@@ -51,10 +54,12 @@ def get_leaderboard_and_rank(current_user=None):
             if data['user_id'] == current_user.id:
                 user_rank = i + 1
                 break
-    
-    # Format for the template
+
+    total_users = len(leaderboard_data)
+
+    # Format for the leaderboard
     leaderboard = []
-    for i, data in enumerate(leaderboard_data[:5]): # Get top 5
+    for i, data in enumerate(leaderboard_data[:5]):  # Get top 5
         rank_icon = '🏆'
         if i == 0: rank_icon = '🥇'
         elif i == 1: rank_icon = '🥈'
@@ -67,8 +72,16 @@ def get_leaderboard_and_rank(current_user=None):
             'emission': f"{data['emission']:.1f} kg",
             'reduction': 'N/A'
         })
-    
-    return leaderboard, user_rank
+
+    # New: Compose a dict for rank out of total, used by the profile page
+    ranking_data = {
+        "city": {"rank": "N/A", "total": "N/A"},
+        "state": {"rank": "N/A", "total": "N/A"},
+        "country": {"rank": user_rank, "total": total_users}
+    }
+
+    # Default return is compatible: leaderboard, user_rank, ranking_data for profile use
+    return leaderboard, user_rank, ranking_data
 
 
 @decorators.login_required
@@ -96,7 +109,7 @@ def myprofile(request):
     ).aggregate(total=Sum('co2_equivalent_kg'))
     total_footprint_this_month = monthly_emissions['total'] or 0
 
-    _, user_rank = get_leaderboard_and_rank(request.user) # Get current user's rank
+    _,_, user_rank = get_leaderboard_and_rank(request.user) # Get current user's rank
 
     category_data_query = Emission.objects.filter(activity__user=request.user, activity__timestamp__gte=start_of_month).values('activity__category').annotate(total=Sum('co2_equivalent_kg'))
     category_data = {'labels': [item['activity__category'].capitalize() for item in category_data_query], 'data': [item['total'] for item in category_data_query]}
@@ -117,14 +130,12 @@ def myprofile(request):
     active_days = Activity.objects.filter(user=request.user).dates('timestamp', 'day')
     streak_data_for_chart = {"active_days": [d.strftime("%Y-%m-%d") for d in active_days]}
 
-    # Pass the user_rank in a dictionary for the ranking card
-    ranking_data = {'country': {'rank': user_rank}}
 
     context = {
         'u_form': u_form,
         'p_form': p_form,
         'total_footprint_this_month': round(total_footprint_this_month, 2),
-        'ranking_data_json': json.dumps(ranking_data), # Pass rank to JS
+        'ranking_data': user_rank, 
         'category_data_json': json.dumps(category_data),
         'trends_data_json': json.dumps(trends_data),
         'streak_data_json': json.dumps(streak_data_for_chart),
@@ -148,7 +159,15 @@ def home(request):
         recent_badges = [{'icon': '🌟', 'name': 'Welcome!'}]
 
     # --- REAL LEADERBOARD & RANK ---
-    leaderboard, user_rank = get_leaderboard_and_rank(request.user if request.user.is_authenticated else None)
+    leaderboard, user_rank,_ = get_leaderboard_and_rank(request.user if request.user.is_authenticated else None)
+
+     # --- NEW: GENERATE THE HEATMAP ---
+    # 1. Get all user profiles that have a location defined
+    all_profiles_with_location = Profile.objects.filter(location__isnull=False).exclude(location__exact='')
+    # 2. Call the map generator function with the profile data
+    india_map_html = generate_india_heatmap_from_profiles(all_profiles_with_location)
+    # --- END OF NEW LOGIC ---
+
 
     context = {
         'global_stats': {'totalUsers': total_users, 'co2Saved': 847, 'countriesCount': 67},
@@ -163,7 +182,8 @@ def home(request):
             'tip': {'icon': '💡', 'title': "Today's Eco Tip", 'content': 'Replace 1 car trip with biking today', 'impact': 'Potential save: 2.3kg CO2'},
             'weather': {'icon': '☀️', 'title': "Weather Advice", 'content': 'Perfect day for cycling!', 'impact': 'Air quality: Good'},
             'events': {'icon': '🌱', 'title': "Local Events", 'content': 'Tree planting drive this Saturday', 'impact': 'Green Park 10AM'},
-        }
+        },
+        'india_map_html': india_map_html, 
     }
     return render(request, 'tracker/home.html', context)
 

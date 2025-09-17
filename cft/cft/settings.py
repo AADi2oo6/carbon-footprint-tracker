@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'tracker',
+    'widget_tweaks',
+    'django.contrib.humanize'
 ]
 
 MIDDLEWARE = [
