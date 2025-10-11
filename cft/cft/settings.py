@@ -78,11 +78,14 @@ WSGI_APPLICATION = 'cft.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'CFT_DB',               # The new database name you just created
+        'USER': 'myuser',               # The existing user from your docker-compose.yml
+        'PASSWORD': '202510',            # The existing password from your docker-compose.yml
+        'HOST': 'localhost',            # Connect via the mapped port on your computer
+        'PORT': '5432',                 # The port mapped in your docker-compose.yml
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
