@@ -34,6 +34,10 @@ def generate_india_heatmap_from_profiles(profiles):
                     # Split "City, State" and take the state part.
                     # .strip() removes any accidental leading/trailing whitespace.
                     state = profile.location.split(',')[1].strip()
+                    print("-----------------------------------------------------------------------")
+                    print(state)
+                    print("-----------------------------------------------------------------------")
+
                     state_list.append(state)
                 except IndexError:
                     # This will skip any locations that don't fit the format.

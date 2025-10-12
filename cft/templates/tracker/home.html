@@ -90,6 +90,10 @@
     }
     .activity-log-details { flex-grow: 1; }
     .activity-log-impact { font-weight: 600; color: #343a40; }
+    .achievement-icon {
+        font-size: 1.5rem;
+        color: #ffc107;
+    }
 </style>
 
 <!-- NEW: Floating Page Navigation -->
@@ -345,12 +349,17 @@
                     <div class="engagement-card badges-card">
                         <h3>🏆 Recent Badges</h3>
                         <div class="badges-grid">
-                            {% for badge in recent_badges %}
-                            <div class="badge-item">
-                                <div class="badge-icon">{{ badge.icon }}</div>
-                                <div class="badge-name">{{ badge.name }}</div>
+                            <div class="list-group list-group-flush w-100">
+                    {% for achievement in global_achievements %}
+                        <div class="list-group-item d-flex align-items-center">
+                             <i class="{{ achievement.icon }} achievement-icon mr-3"></i>
+                            <div>
+                                <strong>{{ achievement.name }}</strong>
+                                <small class="d-block text-muted">{{ achievement.description }}</small>
                             </div>
-                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
                         </div>
                     </div>
                     <div class="engagement-card actions-card">
@@ -409,38 +418,47 @@
 
         <!-- 10. Actionable Insights -->
         <section id="insights" class="insights">
-            <div class="container">
-                <h2 class="section-title">💡 Actionable Insights</h2>
-                <div class="insights-grid">
-                    <div class="insight-card tip-card">
-                        <div class="insight-header">
-                            <span class="insight-icon">{{ insights.tip.icon }}</span>
-                            <h3>{{ insights.tip.title }}</h3>
-                        </div>
-                        <p class="insight-content">{{ insights.tip.content }}</p>
-                        <p class="insight-impact">{{ insights.tip.impact }}</p>
+        <div class="container">
+            <h2 class="section-title">💡 Actionable Insights</h2>
+            <div class="insights-grid">
+                <div class="insight-card tip-card">
+                    <div class="insight-header">
+                        <span class="insight-icon">{{ insights.tip.icon }}</span>
+                        <h3>{{ insights.tip.title }}</h3>
                     </div>
-                    <div class="insight-card weather-card">
-                        <div class="insight-header">
-                            <span class="insight-icon">{{ insights.weather.icon }}</span>
-                            <h3>{{ insights.weather.title }}</h3>
-                        </div>
-                        <p class="insight-content">{{ insights.weather.content }}</p>
-                        <p class="insight-impact">{{ insights.weather.impact }}</p>
-                    </div>
-                    <div class="insight-card events-card">
-                        <div class="insight-header">
-                            <span class="insight-icon">{{ insights.events.icon }}</span>
-                            <h3>{{ insights.events.title }}</h3>
-                        </div>
-                        <p class="insight-content">{{ insights.events.content }}</p>
-                        <p class="insight-impact">{{ insights.events.impact }}</p>
-                    </div>
+                    <p class="insight-content">{{ insights.tip.content }}</p>
+                    <p class="insight-impact">{{ insights.tip.impact }}</p>
                 </div>
-            </div>
-        </section>
-    </main>
-</div>
+                <div class="insight-card weather-card">
+                    <div class="insight-header">
+                        <span class="insight-icon">{{ insights.weather.icon }}</span>
+                        <h3>{{ insights.weather.title }}</h3>
+                    </div>
+                    <p class="insight-content">{{ insights.weather.content }}</p>
+                    <p class="insight-impact">{{ insights.weather.impact }}</p>
+                </div>
+                
+                <div class="insight-card events-card">
+                    <div class="insight-header">
+                        <span class="insight-icon">🌱</span>
+                        <h3>Local Events</h3>
+                    </div>
+                    {% if local_events %}
+                        {% for event in local_events|slice:":2" %}
+                            <div class="event-item mb-3">
+                                <a href="{{ event.link }}" target="_blank" rel="noopener noreferrer" class="insight-content" style="font-weight: bold; text-decoration: none;">
+                                    {{ event.title }}
+                                </a>
+                                <p class="insight-impact mb-0">{{ event.published }}</p>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="insight-content">No recent local events found.</p>
+                    {% endif %}
+                </div>
+                </div>
+        </div>
+    </section>
 
 
 <!-- Pass Django data to JavaScript -->

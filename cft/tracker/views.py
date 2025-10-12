@@ -1,3 +1,6 @@
+from pygooglenews import GoogleNews
+from datetime import datetime
+import time
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, get_user_model, decorators, forms as auth_forms
 from django.contrib import messages
@@ -10,6 +13,7 @@ import json
 from datetime import date, timedelta
 import random
 from .map_assets.map_generator import generate_india_heatmap_from_profiles
+import requests
 
  
 
@@ -146,6 +150,60 @@ def myprofile(request):
 
 
 def home(request):
+    today = date.today()
+    selected_date_str = request.GET.get('dateFilter', today.strftime("%Y-%m-%d"))
+    selected_category = request.GET.get('categoryFilter', 'all') 
+    this_month_emissions=0
+    last_month_emissions = 0
+
+    try:
+        selected_date = date.fromisoformat(selected_date_str)
+        activities = Activity.objects.filter(user=request.user, timestamp__date=selected_date).order_by('-timestamp')
+        if selected_category != 'all':
+            activities = activities.filter(category=selected_category)
+    except (ValueError, TypeError):
+        selected_date_str = today.strftime("%Y-%m-%d")
+        activities = Activity.objects.none()
+        messages.error(request, "Invalid date format provided.")
+
+    # --- NEW: Calculate emission stats ---
+    search_location = "India" # Default location for logged-out users
+    if request.user.is_authenticated and request.user.profile.location:
+        search_location = request.user.profile.location
+        # Monthly totals
+        this_month_start = today.replace(day=1)
+        last_month_end = this_month_start - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+
+        this_month_emissions = Activity.objects.filter(user=request.user, timestamp__date__gte=this_month_start).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+        last_month_emissions = Activity.objects.filter(user=request.user, timestamp__date__gte=last_month_start, timestamp__date__lte=last_month_end).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+
+        
+    ai_tip_content='Replace 1 car trip with biking today'
+    if request.user.is_authenticated:
+        n8n_webhook_url = "http://localhost:5678/webhook/0881df72-c41b-46bf-9734-532d27e239b9" # <-- MAKE SURE THIS IS YOUR PRODUCTION URL
+        payload = {'user_id': request.user.id}
+        
+        try:
+            response = requests.post(n8n_webhook_url, json=payload, timeout=10)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                response_data = response.json()
+                
+                # CORRECTED LOGIC:
+                # Check if the response is a dictionary and not empty
+                if isinstance(response_data, dict) and response_data:
+                    # Get the first key from the dictionary, which is our AI tip
+                    ai_tip_content = list(response_data.keys())[0]
+                    print(":::::::::::::::::::::::::::::::::::::")
+                    
+                    print(list(response_data.keys()))
+
+        except requests.exceptions.RequestException as e:
+            # If n8n is down or there's a network error, we just log it and use the default tip
+            print(f"Could not connect to n8n workflow: {e}")
+
     total_users = User.objects.count()
     country_comparison = {'user_country_name': 'India', 'user_country_flag': 'https://flagcdn.com/w40/in.png', 'user_value': 1.9, 'global_value': 4.7}
     max_val = max(country_comparison['user_value'], country_comparison['global_value'], 1) * 1.1
@@ -166,23 +224,52 @@ def home(request):
     all_profiles_with_location = Profile.objects.filter(location__isnull=False).exclude(location__exact='')
     # 2. Call the map generator function with the profile data
     india_map_html = generate_india_heatmap_from_profiles(all_profiles_with_location)
-    # --- END OF NEW LOGIC ---
+
+    local_events = []
+    try:
+        gn = GoogleNews(lang='en', country='IN')
+        news = gn.search(f"({search_location}) AND (tree plantation OR cleanliness drive OR environment OR sustainable OR eco-friendly)")
+        
+        # Loop through the top 5 entries
+        for entry in news['entries'][:5]:
+            # Convert the published date into a more readable format
+            published_datetime = datetime.fromtimestamp(time.mktime(entry.published_parsed))
+            
+            local_events.append({
+                'title': entry.title,
+                'link': entry.link,
+                'published': published_datetime.strftime('%d %b, %Y')
+            })
+            
+    except Exception as e:
+        print(f"Could not fetch Google News: {e}")
+        # If the search fails, the local_events list will remain empty.
 
 
+    emissions_breakdown = {
+        'labels': ['Transport', 'Housing', 'Food', 'Shopping'],
+        'data': [40, 35, 15, 10],
+        'colors': ['#EF4444', '#F59E0B', '#10B981', '#3B82F6'],
+    }
     context = {
         'global_stats': {'totalUsers': total_users, 'co2Saved': 847, 'countriesCount': 67},
         'country_comparison': country_comparison,
         'recent_badges': recent_badges,
         'leaderboard': leaderboard,
-        'summary_data': {'this_month': 0, 'last_month': 0, 'improvement': 0, 'rank': user_rank}, # Use real rank
-        'emissions_table_data': [],
+        'summary_data': {'this_month': round(this_month_emissions, 2), 'last_month': round(last_month_emissions, 2), 'improvement': round(last_month_emissions, 2)-round(this_month_emissions, 2), 'rank': user_rank}, # Use real rank
+
+        'emissions_table_data': zip(
+        emissions_breakdown['labels'],
+        emissions_breakdown['data'],
+        emissions_breakdown['colors']),
         'emissions_data_json': json.dumps({'labels': [], 'data': []}),
         'daily_challenge': {'text': 'Log your first activity!', 'impact': ''},
         'insights': {
-            'tip': {'icon': '💡', 'title': "Today's Eco Tip", 'content': 'Replace 1 car trip with biking today', 'impact': 'Potential save: 2.3kg CO2'},
+            'tip': {'icon': '💡', 'title': "Today's Eco Tip", 'content':ai_tip_content , 'impact': 'Potential save: 2.3kg CO2'},
             'weather': {'icon': '☀️', 'title': "Weather Advice", 'content': 'Perfect day for cycling!', 'impact': 'Air quality: Good'},
-            'events': {'icon': '🌱', 'title': "Local Events", 'content': 'Tree planting drive this Saturday', 'impact': 'Green Park 10AM'},
         },
+        # Pass the new list of events to the template
+        'local_events': local_events,
         'india_map_html': india_map_html, 
     }
     return render(request, 'tracker/home.html', context)
