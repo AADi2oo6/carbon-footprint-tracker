@@ -79,11 +79,11 @@ WSGI_APPLICATION = 'cft.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'CFT_DB',               # The new database name you just created
-        'USER': 'myuser',               # The existing user from your docker-compose.yml
-        'PASSWORD': '202510',            # The existing password from your docker-compose.yml
-        'HOST': 'localhost',            # Connect via the mapped port on your computer
-        'PORT': '5432',                 # The port mapped in your docker-compose.yml
+        'NAME': 'postgres',
+        'USER': 'postgres.rmpfmxnrsochmbgjeycz',
+        'PASSWORD': '20251@Adi',  # Your database password
+        'HOST': 'aws-1-ap-southeast-2.pooler.supabase.com', # The host from your screenshot
+        'PORT': '5432', # The port from your screenshot
     }
 }
 
