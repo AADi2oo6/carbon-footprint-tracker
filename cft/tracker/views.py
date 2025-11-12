@@ -14,6 +14,7 @@ from datetime import date, timedelta
 import random
 from .map_assets.map_generator import generate_india_heatmap_from_profiles
 import requests
+from .ml_utils import predict_emission
 
 def get_user_summary_data(user):
     """
@@ -366,46 +367,42 @@ def activity(request):
                 else: messages.error(request, error_message)
             return redirect(redirect_url)
 
-        # Handle activity CREATION (existing logic)
+        # Handle activity CREATION (using ML model for emission calculation)
         category = request.POST.get('category')
-        # A simple placeholder for emission factor calculation.
-        # In a real app, this would be a more complex lookup from a dedicated model or configuration file.
-        EMISSION_FACTORS = {
-            'travel': {'car-gasoline': 0.25, 'bus': 0.1, 'flight-short': 0.2, 'car-electric': 0.05, 'train': 0.04, 'motorcycle': 0.1, 'bicycle': 0, 'walking': 0, 'flight-long': 0.25},
-            'energy': {'electricity': 0.39},
-            'food': {'red-meat': 7.1, 'white-meat': 2.5, 'fish': 1.5, 'vegetarian': 1.0, 'vegan': 0.7, 'other': 1.2},
-            'purchases': {'clothing': 0.1, 'electronics': 0.5, 'home-goods': 0.3, 'services': 0.05, 'other': 0.2}
-        }
 
         try:
             if category == 'transport':
                 mode = request.POST.get('transportMode')
                 distance = float(request.POST.get('distance'))
-                footprint = distance * EMISSION_FACTORS['travel'].get(mode, 0.15)
+                # Use ML model to predict emission with user location
+                user_location = getattr(request.user.profile, 'location', None)
+                footprint = predict_emission('transport', mode, distance, user_location)
                 description = f"Travel: {mode.replace('-', ' ').title()} - {distance} km"
                 new_activity = Activity.objects.create(user=request.user, category='transport', description=description, value=distance, unit='km')
             
             elif category == 'energy':
                 units = float(request.POST.get('electricityUnits'))
-                footprint = units * EMISSION_FACTORS['energy']['electricity']
+                # Use ML model to predict emission with user location
+                user_location = getattr(request.user.profile, 'location', None)
+                footprint = predict_emission('energy', 'electricity', units, user_location)
                 description = f"Energy: Manual Entry - {units} kWh"
                 new_activity = Activity.objects.create(user=request.user, category='energy', description=description, value=units, unit='kWh')
 
             elif category == 'food':
                 diet_type = request.POST.get('dietType')
                 quantity = float(request.POST.get('foodQuantity', 1))
-                footprint = quantity * EMISSION_FACTORS['food'].get(diet_type, 1.0)
+                # Use ML model to predict emission with user location
+                user_location = getattr(request.user.profile, 'location', None)
+                footprint = predict_emission('food', diet_type, quantity, user_location)
                 description = f"Food: {diet_type.replace('-', ' ').title()} ({quantity} servings)"
                 new_activity = Activity.objects.create(user=request.user, category='food', description=description, value=quantity, unit='serving')
 
             elif category == 'consumption':
                 purchase_cat = request.POST.get('purchaseCategory')
                 amount = float(request.POST.get('purchaseAmount'))
-                # Convert INR to a USD-equivalent for consistent emission factor application
-                # Using an approximate conversion rate (e.g., 1 USD = 83 INR)
-                INR_TO_USD_RATE = 1 / 83 
-                amount_in_usd_equivalent = amount * INR_TO_USD_RATE
-                footprint = amount_in_usd_equivalent * EMISSION_FACTORS['purchases'].get(purchase_cat, 0.2)
+                # Use ML model to predict emission with user location
+                user_location = getattr(request.user.profile, 'location', None)
+                footprint = predict_emission('consumption', purchase_cat, amount, user_location)
                 description = f"Purchase: {purchase_cat.replace('-', ' ').title()} - ₹{amount:,.2f}"
                 new_activity = Activity.objects.create(user=request.user, category='consumption', description=description, value=amount, unit='INR')
             
