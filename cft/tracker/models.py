@@ -14,15 +14,9 @@ class Profile(models.Model):
 
 # 2. Activity Model (The Core of the App)
 class Activity(models.Model):
-    ACTIVITY_CATEGORIES = [
-        ('transport', 'Transportation'),
-        ('energy', 'Home Energy'),
-        ('food', 'Food & Diet'),
-        ('consumption', 'Consumption'),
-        ('waste', 'Waste'),
-    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    category = models.CharField(max_length=20, choices=ACTIVITY_CATEGORIES)
+    category = models.CharField(max_length=20)
     description = models.CharField(max_length=255)
     value = models.FloatField(help_text="e.g., distance in km, energy in kWh, quantity of items")
     unit = models.CharField(max_length=50, help_text="e.g., 'km', 'kWh', 'serving'")

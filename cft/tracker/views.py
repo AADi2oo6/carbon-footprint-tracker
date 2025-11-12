@@ -15,7 +15,41 @@ import random
 from .map_assets.map_generator import generate_india_heatmap_from_profiles
 import requests
 
- 
+def get_user_summary_data(user):
+    """
+    Calculates the summary data (this month's emissions, last month's, and improvement)
+    for a given user.
+    """
+    today = date.today()
+    this_month_start = today.replace(day=1)
+    last_month_end = this_month_start - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+
+    # Get total emissions for the current month
+    this_month_emissions = Emission.objects.filter(
+        activity__user=user, 
+        activity__timestamp__gte=this_month_start
+    ).aggregate(total=Sum('co2_equivalent_kg'))['total'] or 0
+
+    # Get total emissions for the previous month
+    last_month_emissions = Emission.objects.filter(
+        activity__user=user,
+        activity__timestamp__gte=last_month_start,
+        activity__timestamp__lte=last_month_end
+    ).aggregate(total=Sum('co2_equivalent_kg'))['total'] or 0
+    
+    # Calculate the percentage improvement
+    improvement = 0
+    if last_month_emissions > 0:
+        # Improvement is the reduction from last month
+        improvement = round(((last_month_emissions - this_month_emissions) / last_month_emissions) * 100)
+    
+    return {
+        'this_month': round(this_month_emissions / 1000, 1), # Convert kg to tons
+        'last_month': round(last_month_emissions / 1000, 1), # Convert kg to tons
+        'improvement': improvement,
+    }
+
 
 # --- (register view remains the same) ---
 def register(request):
@@ -113,9 +147,11 @@ def myprofile(request):
     ).aggregate(total=Sum('co2_equivalent_kg'))
     total_footprint_this_month = monthly_emissions['total'] or 0
 
-    _,_, user_rank = get_leaderboard_and_rank(request.user) # Get current user's rank
+    # We assume get_leaderboard_and_rank is defined elsewhere in this file
+    _, user_rank, _ = get_leaderboard_and_rank(request.user) # Get current user's rank
 
-    category_data_query = Emission.objects.filter(activity__user=request.user, activity__timestamp__gte=start_of_month).values('activity__category').annotate(total=Sum('co2_equivalent_kg'))
+    # --- UPDATED: Pie chart now shows all-time data breakdown ---
+    category_data_query = Emission.objects.filter(activity__user=request.user).values('activity__category').annotate(total=Sum('co2_equivalent_kg'))
     category_data = {'labels': [item['activity__category'].capitalize() for item in category_data_query], 'data': [item['total'] for item in category_data_query]}
     
     trends_data = {'labels': [], 'data': []}
@@ -134,7 +170,6 @@ def myprofile(request):
     active_days = Activity.objects.filter(user=request.user).dates('timestamp', 'day')
     streak_data_for_chart = {"active_days": [d.strftime("%Y-%m-%d") for d in active_days]}
 
-
     context = {
         'u_form': u_form,
         'p_form': p_form,
@@ -147,7 +182,6 @@ def myprofile(request):
         'actionable_insights': actionable_insights,
     }
     return render(request, 'tracker/myprofile.html', context)
-
 
 def home(request):
     today = date.today()
@@ -422,18 +456,21 @@ def activity(request):
     # --- NEW: Calculate emission stats ---
     from django.db.models import Sum
     yesterday = today - timedelta(days=1)
+
+    # Create a new base query for calculating stats that ignores the date/category filters
+    base_query = Activity.objects.filter(user=request.user)
     
     # Today and Yesterday's totals
-    today_emissions = activities.filter(timestamp__date=today).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
-    yesterday_emissions = Activity.objects.filter(user=request.user, timestamp__date=yesterday).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+    today_emissions = base_query.filter(timestamp__date=today).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+    yesterday_emissions = base_query.filter(timestamp__date=yesterday).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
 
     # Monthly totals
     this_month_start = today.replace(day=1)
     last_month_end = this_month_start - timedelta(days=1)
     last_month_start = last_month_end.replace(day=1)
 
-    this_month_emissions = Activity.objects.filter(user=request.user, timestamp__date__gte=this_month_start).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
-    last_month_emissions = Activity.objects.filter(user=request.user, timestamp__date__gte=last_month_start, timestamp__date__lte=last_month_end).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+    this_month_emissions = base_query.filter(timestamp__date__gte=this_month_start).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+    last_month_emissions = base_query.filter(timestamp__date__gte=last_month_start, timestamp__date__lte=last_month_end).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
 
     # --- NEW: Carbon Budget Calculation ---
     # Using hardcoded limits for now. In a real app, these would be user-configurable.
