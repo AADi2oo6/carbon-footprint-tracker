@@ -126,7 +126,7 @@ else:
 
 # Save to the correct location to replace the existing model
 if best_model is not None:
-    joblib.dump(best_model, "cft/hybrid_emission_model.pkl")
-    print(" Model saved as 'cft/hybrid_emission_model.pkl'")
+    joblib.dump(best_model, "models/hybrid_emission_model.pkl")
+    print(" Model saved as 'models/hybrid_emission_model.pkl'")
 else:
     print(" No model to save")
