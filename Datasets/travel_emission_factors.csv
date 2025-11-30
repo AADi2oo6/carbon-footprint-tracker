@@ -1,0 +1,10 @@
+travel_mode,co2_per_km
+car_gasoline,0.192
+car_diesel,0.2
+car_electric,0.05
+bus,0.1
+train,0.041
+bike,0.0
+walk,0.0
+flight_short,0.25
+flight_long,0.15

@@ -14,6 +14,17 @@ from datetime import date, timedelta
 import random
 from .map_assets.map_generator import generate_india_heatmap_from_profiles
 import requests
+import os
+import pickle
+import sys
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+
+# Add the project directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+# Import the data extractor module
+from ml_pipeline.data_extractor import get_user_features
 
 def get_user_summary_data(user):
     """
@@ -186,57 +197,147 @@ def myprofile(request):
 def home(request):
     today = date.today()
     selected_date_str = request.GET.get('dateFilter', today.strftime("%Y-%m-%d"))
-    selected_category = request.GET.get('categoryFilter', 'all') 
-    this_month_emissions=0
-    last_month_emissions = 0
+    selected_category = request.GET.get('categoryFilter', 'all')
 
+    # --- NEW: Fetch emissions data for charts ---
+    # Base query for user's emissions
+    base_query = Activity.objects.filter(user=request.user)
+    
+    # Apply filters if they exist
+    if selected_date_str:
+        selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
+        base_query = base_query.filter(timestamp__date=selected_date)
+        
+    if selected_category != 'all':
+        base_query = base_query.filter(category=selected_category)
+
+    # Get emissions for the selected criteria
+    activities_with_emissions = base_query.select_related('emission').order_by('-timestamp')
+    
+    # --- NEW: Summary Stats ---
+    # Today
+    today_start = today
+    today_emissions = base_query.filter(timestamp__date=today_start).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+
+    # Yesterday
+    yesterday = today - timedelta(days=1)
+    yesterday_emissions = base_query.filter(timestamp__date=yesterday).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+
+    # This Month
+    this_month_start = today.replace(day=1)
+    this_month_emissions = base_query.filter(timestamp__date__gte=this_month_start).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+
+    # Last Month
+    last_month_end = this_month_start - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+    last_month_emissions = base_query.filter(timestamp__date__gte=last_month_start, timestamp__date__lte=last_month_end).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
+
+    # --- NEW: Carbon Budget Calculation ---
+    # Using hardcoded limits for now. In a real app, these would be user-configurable.
+    daily_limit = 15 # kg CO2e
+    monthly_limit = 450 # kg CO2e
+    
+    daily_budget_percentage = round((today_emissions / daily_limit) * 100) if daily_limit > 0 else 0
+    monthly_budget_percentage = round((this_month_emissions / monthly_limit) * 100) if monthly_limit > 0 else 0
+
+    # --- NEW: Location-based events ---
+    # Get the user's location from their profile, default to "Delhi" if not set
     try:
-        selected_date = date.fromisoformat(selected_date_str)
-        activities = Activity.objects.filter(user=request.user, timestamp__date=selected_date).order_by('-timestamp')
-        if selected_category != 'all':
-            activities = activities.filter(category=selected_category)
-    except (ValueError, TypeError):
-        selected_date_str = today.strftime("%Y-%m-%d")
-        activities = Activity.objects.none()
-        messages.error(request, "Invalid date format provided.")
-
-    # --- NEW: Calculate emission stats ---
-    search_location = "India" # Default location for logged-out users
-    if request.user.is_authenticated and request.user.profile.location:
-        search_location = request.user.profile.location
-        # Monthly totals
-        this_month_start = today.replace(day=1)
-        last_month_end = this_month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
-
-        this_month_emissions = Activity.objects.filter(user=request.user, timestamp__date__gte=this_month_start).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
-        last_month_emissions = Activity.objects.filter(user=request.user, timestamp__date__gte=last_month_start, timestamp__date__lte=last_month_end).aggregate(total=Sum('emission__co2_equivalent_kg'))['total'] or 0
-
+        search_location = request.user.profile.location or "Delhi"
+    except:
+        search_location = "Delhi"
+    
+    # --- NEW: AI-powered daily tip ---
+    ai_tip_content = "Log activities regularly to track your carbon footprint accurately."
+    try:
+        # Make a request to the n8n webhook
+        response = requests.post(
+            'https://n8n-cft-production.up.railway.app/webhook/cft-daily-tip',
+            json={"user_id": request.user.id},
+            timeout=5  # Don't hang the page load if n8n is slow/unavailable
+        )
+        if response.status_code == 200:
+            ai_response = response.json()
+            ai_tip_content = ai_response.get("tip", ai_tip_content)
+    except requests.exceptions.RequestException as e:
+        # If n8n is down or there's a network error, we just log it and use the default tip
+        print(f"Could not connect to n8n workflow: {e}")
+    
+    # Get KMeans clustering insights
+    cluster_id = 1  # Default cluster
+    eco_tip = "Keep up the good work on reducing your carbon footprint!"  # Default tip
+    dynamic_suggestions = []  # Default empty suggestions
+    
+    try:
+        # Try to get insights from our ML API
+        from ml_pipeline.data_extractor import get_user_features
+        from sklearn.preprocessing import StandardScaler
+        import pickle
+        import os
+        import pandas as pd
         
-    ai_tip_content='Replace 1 car trip with biking today'
-    if request.user.is_authenticated:
-        n8n_webhook_url = "http://localhost:5678/webhook/0881df72-c41b-46bf-9734-532d27e239b9" # <-- MAKE SURE THIS IS YOUR PRODUCTION URL
-        payload = {'user_id': request.user.id}
+        # Extract features for the current user
+        user_features = get_user_features(request.user)
         
-        try:
-            response = requests.post(n8n_webhook_url, json=payload, timeout=10)
+        # Prepare features for prediction (exclude user_id)
+        feature_columns = [col for col in user_features.keys() if col != 'user_id']
+        user_feature_values = [user_features[col] for col in feature_columns]
+        
+        # Convert to DataFrame for consistency with training
+        X = pd.DataFrame([user_feature_values], columns=feature_columns)
+        
+        # Handle any missing values
+        X = X.fillna(0)
+        
+        # Load the scaler and model
+        model_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'ml_models')
+        
+        scaler_path = os.path.join(model_dir, 'scaler.pkl')
+        kmeans_path = os.path.join(model_dir, 'kmeans.pkl')
+        
+        if os.path.exists(scaler_path) and os.path.exists(kmeans_path):
+            with open(scaler_path, 'rb') as f:
+                scaler = pickle.load(f)
             
-            # Check if the request was successful
-            if response.status_code == 200:
-                response_data = response.json()
-                
-                # CORRECTED LOGIC:
-                # Check if the response is a dictionary and not empty
-                if isinstance(response_data, dict) and response_data:
-                    # Get the first key from the dictionary, which is our AI tip
-                    ai_tip_content = list(response_data.keys())[0]
-                    print(":::::::::::::::::::::::::::::::::::::")
-                    
-                    print(list(response_data.keys()))
-
-        except requests.exceptions.RequestException as e:
-            # If n8n is down or there's a network error, we just log it and use the default tip
-            print(f"Could not connect to n8n workflow: {e}")
+            with open(kmeans_path, 'rb') as f:
+                kmeans = pickle.load(f)
+            
+            # Scale the features
+            X_scaled = scaler.transform(X)
+            
+            # Predict cluster
+            cluster_id = int(kmeans.predict(X_scaled)[0])
+            
+            # Get cluster center for this cluster and inverse transform it
+            cluster_centers_scaled = kmeans.cluster_centers_
+            cluster_center_scaled = cluster_centers_scaled[cluster_id].reshape(1, -1)
+            cluster_center_unscaled = scaler.inverse_transform(cluster_center_scaled)
+            
+            # Convert cluster center to dictionary
+            cluster_center_dict = {}
+            for i, col in enumerate(feature_columns):
+                cluster_center_dict[col] = float(cluster_center_unscaled[0][i])
+            
+            # Generate dynamic suggestions
+            dynamic_suggestions = calculate_dynamic_suggestions(user_features, cluster_center_dict, cluster_id)
+            
+            # For backward compatibility, keep the old eco_tip format
+            eco_tips = {
+                0: "You're doing great! Try reducing meat consumption for even better results.",
+                1: "Good effort! Consider using public transportation more often.",
+                2: "You're making progress! Focus on reducing energy consumption at home.",
+                3: "Keep going! Small changes in daily habits can make a big difference."
+            }
+            
+            # Get the appropriate eco tip
+            eco_tip = eco_tips.get(cluster_id, "Keep up the good work on reducing your carbon footprint!")
+        else:
+            print("Model files not found!")
+    except Exception as e:
+        print(f"Error getting clustering insights: {e}")
+        import traceback
+        traceback.print_exc()
+        # Use default values if there's an error
 
     total_users = User.objects.count()
     country_comparison = {'user_country_name': 'India', 'user_country_flag': 'https://flagcdn.com/w40/in.png', 'user_value': 1.9, 'global_value': 4.7}
@@ -304,7 +405,11 @@ def home(request):
         },
         # Pass the new list of events to the template
         'local_events': local_events,
-        'india_map_html': india_map_html, 
+        'india_map_html': india_map_html,
+        # Pass clustering insights
+        'cluster_id': cluster_id,
+        'eco_tip': eco_tip,
+        'dynamic_suggestions': dynamic_suggestions,  # New dynamic suggestions
     }
     return render(request, 'tracker/home.html', context)
 
@@ -368,33 +473,31 @@ def activity(request):
 
         # Handle activity CREATION (existing logic)
         category = request.POST.get('category')
-        # A simple placeholder for emission factor calculation.
-        # In a real app, this would be a more complex lookup from a dedicated model or configuration file.
-        EMISSION_FACTORS = {
-            'travel': {'car-gasoline': 0.25, 'bus': 0.1, 'flight-short': 0.2, 'car-electric': 0.05, 'train': 0.04, 'motorcycle': 0.1, 'bicycle': 0, 'walking': 0, 'flight-long': 0.25},
-            'energy': {'electricity': 0.39},
-            'food': {'red-meat': 7.1, 'white-meat': 2.5, 'fish': 1.5, 'vegetarian': 1.0, 'vegan': 0.7, 'other': 1.2},
-            'purchases': {'clothing': 0.1, 'electronics': 0.5, 'home-goods': 0.3, 'services': 0.05, 'other': 0.2}
-        }
+        
+        # Import the emission factor functions that use real datasets
+        from emission_factors import get_energy_co2, get_food_co2, get_travel_co2, get_purchase_co2
 
         try:
             if category == 'transport':
                 mode = request.POST.get('transportMode')
                 distance = float(request.POST.get('distance'))
-                footprint = distance * EMISSION_FACTORS['travel'].get(mode, 0.15)
+                # Use real emission factors from datasets
+                footprint = get_travel_co2(mode, distance)
                 description = f"Travel: {mode.replace('-', ' ').title()} - {distance} km"
                 new_activity = Activity.objects.create(user=request.user, category='transport', description=description, value=distance, unit='km')
             
             elif category == 'energy':
                 units = float(request.POST.get('electricityUnits'))
-                footprint = units * EMISSION_FACTORS['energy']['electricity']
+                # Use real emission factors from datasets
+                footprint = get_energy_co2("electricity", units)
                 description = f"Energy: Manual Entry - {units} kWh"
                 new_activity = Activity.objects.create(user=request.user, category='energy', description=description, value=units, unit='kWh')
 
             elif category == 'food':
                 diet_type = request.POST.get('dietType')
                 quantity = float(request.POST.get('foodQuantity', 1))
-                footprint = quantity * EMISSION_FACTORS['food'].get(diet_type, 1.0)
+                # Use real emission factors from datasets
+                footprint = get_food_co2(diet_type, quantity)
                 description = f"Food: {diet_type.replace('-', ' ').title()} ({quantity} servings)"
                 new_activity = Activity.objects.create(user=request.user, category='food', description=description, value=quantity, unit='serving')
 
@@ -405,7 +508,8 @@ def activity(request):
                 # Using an approximate conversion rate (e.g., 1 USD = 83 INR)
                 INR_TO_USD_RATE = 1 / 83 
                 amount_in_usd_equivalent = amount * INR_TO_USD_RATE
-                footprint = amount_in_usd_equivalent * EMISSION_FACTORS['purchases'].get(purchase_cat, 0.2)
+                # Use real emission factors from datasets
+                footprint = get_purchase_co2(purchase_cat, amount_in_usd_equivalent)
                 description = f"Purchase: {purchase_cat.replace('-', ' ').title()} - ₹{amount:,.2f}"
                 new_activity = Activity.objects.create(user=request.user, category='consumption', description=description, value=amount, unit='INR')
             
@@ -611,3 +715,295 @@ def join_challenge(request, pk):
         UserChallenge.objects.get_or_create(user=request.user, challenge=challenge)
         messages.success(request, f"You have joined the challenge: {challenge.title}!")
     return redirect('challenges')
+
+def calculate_dynamic_suggestions(user_features, cluster_center, cluster_id):
+    """
+    Generate dynamic, personalized CO₂-reduction suggestions based on user features and cluster center
+    """
+    suggestions = []
+    
+    # Define emission factors (kg CO2e per unit)
+    emission_factors = {
+        'transport': 0.15,  # Average for various transport modes (kg/km)
+        'energy': 0.39,     # Electricity (kg/kWh)
+        'food': 2.5,        # Average for various foods (kg/meal)
+        'consumption': 0.2  # Average for purchases (kg/USD, converted from INR)
+    }
+    
+    # Convert INR to USD for consumption calculations
+    inr_to_usd_rate = 1 / 83
+    
+    # Compare user features with cluster center to generate suggestions
+    
+    # 1. Transport emissions comparison
+    user_transport = user_features.get('transport_emissions', 0)
+    cluster_transport = cluster_center.get('transport_emissions', 0)
+    transport_diff = user_transport - cluster_transport
+    
+    # Always provide suggestions for high transport emissions, regardless of cluster comparison
+    if user_transport > 50:  # If user has significant transport emissions
+        # Calculate potential savings
+        potential_km_reduction = user_transport * 0.2  # Suggest 20% reduction
+        potential_savings = potential_km_reduction * emission_factors['transport']
+        
+        suggestions.append({
+            "type": "transport",
+            "message": f"Consider using public transport for {potential_km_reduction:.0f} km to save {potential_savings:.1f} kg CO₂.",
+            "savings_kg": round(potential_savings, 2),
+            "action": "travel_less"
+        })
+    elif transport_diff > 0 and cluster_transport > 0:
+        # User has higher transport emissions than cluster average
+        transport_ratio = transport_diff / cluster_transport
+        if transport_ratio > 0.1:  # More than 10% above cluster
+            # Calculate potential savings
+            potential_km_reduction = transport_diff / emission_factors['transport']
+            potential_savings = transport_diff
+            
+            suggestions.append({
+                "type": "transport",
+                "message": f"Reduce car travel by {potential_km_reduction:.0f} km to save {potential_savings:.1f} kg CO₂.",
+                "savings_kg": round(potential_savings, 2),
+                "action": "travel_less"
+            })
+        else:
+            suggestions.append({
+                "type": "transport",
+                "message": "Your travel emissions are already close to cluster average—good job!",
+                "savings_kg": 0,
+                "action": "maintain"
+            })
+    elif transport_diff <= 0 and cluster_transport > 0:
+        suggestions.append({
+            "type": "transport",
+            "message": "Your travel emissions are already below cluster average—great job!",
+            "savings_kg": 0,
+            "action": "maintain"
+        })
+    else:
+        suggestions.append({
+            "type": "transport",
+            "message": "No transport data available for comparison.",
+            "savings_kg": 0,
+            "action": "no_data"
+        })
+    
+    # 2. Energy emissions comparison
+    user_energy = user_features.get('energy_emissions', 0)
+    cluster_energy = cluster_center.get('energy_emissions', 0)
+    energy_diff = user_energy - cluster_energy
+    
+    # Always provide suggestions for high energy emissions
+    if user_energy > 200:  # If user has significant energy emissions
+        # Calculate potential savings
+        potential_kwh_reduction = user_energy * 0.15  # Suggest 15% reduction
+        potential_savings = potential_kwh_reduction * emission_factors['energy']
+        
+        suggestions.append({
+            "type": "energy",
+            "message": f"Reduce energy use by {potential_kwh_reduction:.0f} kWh to save {potential_savings:.1f} kg CO₂.",
+            "savings_kg": round(potential_savings, 2),
+            "action": "save_energy"
+        })
+    elif energy_diff > 0 and cluster_energy > 0:
+        energy_ratio = energy_diff / cluster_energy
+        if energy_ratio > 0.1:  # More than 10% above cluster
+            # Calculate potential savings
+            potential_kwh_reduction = energy_diff / emission_factors['energy']
+            potential_savings = energy_diff
+            
+            suggestions.append({
+                "type": "energy",
+                "message": f"Reduce energy use by {potential_kwh_reduction:.0f} kWh to save {potential_savings:.1f} kg CO₂.",
+                "savings_kg": round(potential_savings, 2),
+                "action": "save_energy"
+            })
+        else:
+            suggestions.append({
+                "type": "energy",
+                "message": "Your energy emissions are already close to cluster average—good job!",
+                "savings_kg": 0,
+                "action": "maintain"
+            })
+    elif energy_diff <= 0 and cluster_energy > 0:
+        suggestions.append({
+            "type": "energy",
+            "message": "Your energy emissions are already below cluster average—great job!",
+            "savings_kg": 0,
+            "action": "maintain"
+        })
+    else:
+        suggestions.append({
+            "type": "energy",
+            "message": "No energy data available for comparison.",
+            "savings_kg": 0,
+            "action": "no_data"
+        })
+    
+    # 3. Food emissions comparison
+    user_food = user_features.get('food_emissions', 0)
+    cluster_food = cluster_center.get('food_emissions', 0)
+    food_diff = user_food - cluster_food
+    
+    # Always provide suggestions for high food emissions
+    if user_food > 100:  # If user has significant food emissions
+        # Calculate potential savings
+        potential_meals_reduction = user_food / emission_factors['food'] * 0.2  # Suggest reducing 20% of meals
+        potential_savings = potential_meals_reduction * emission_factors['food']
+        
+        suggestions.append({
+            "type": "food",
+            "message": f"Replace {potential_meals_reduction:.0f} high-emission meals this week to save {potential_savings:.1f} kg CO₂.",
+            "savings_kg": round(potential_savings, 2),
+            "action": "eat_less_meat"
+        })
+    elif food_diff > 0 and cluster_food > 0:
+        food_ratio = food_diff / cluster_food
+        if food_ratio > 0.1:  # More than 10% above cluster
+            # Calculate potential savings
+            potential_meals_reduction = food_diff / emission_factors['food']
+            potential_savings = food_diff
+            
+            suggestions.append({
+                "type": "food",
+                "message": f"Replace {potential_meals_reduction:.0f} high-emission meals this week to save {potential_savings:.1f} kg CO₂.",
+                "savings_kg": round(potential_savings, 2),
+                "action": "eat_less_meat"
+            })
+        else:
+            suggestions.append({
+                "type": "food",
+                "message": "Your food emissions are already close to cluster average—good job!",
+                "savings_kg": 0,
+                "action": "maintain"
+            })
+    elif food_diff <= 0 and cluster_food > 0:
+        suggestions.append({
+            "type": "food",
+            "message": "Your food emissions are already below cluster average—great job!",
+            "savings_kg": 0,
+            "action": "maintain"
+        })
+    else:
+        suggestions.append({
+            "type": "food",
+            "message": "No food data available for comparison.",
+            "savings_kg": 0,
+            "action": "no_data"
+        })
+    
+    # 4. Consumption emissions comparison
+    user_consumption = user_features.get('consumption_emissions', 0)
+    cluster_consumption = cluster_center.get('consumption_emissions', 0)
+    consumption_diff = user_consumption - cluster_consumption
+    
+    # Always provide suggestions for high consumption emissions
+    if user_consumption > 200:  # If user has significant consumption emissions
+        # Calculate potential savings
+        potential_inr_reduction = user_consumption / (emission_factors['consumption'] * inr_to_usd_rate) * 0.2  # Suggest reducing 20%
+        potential_savings = user_consumption * 0.2
+        
+        suggestions.append({
+            "type": "consumption",
+            "message": f"Delay non-essential purchases worth ₹{potential_inr_reduction:,.0f} to avoid {potential_savings:.1f} kg CO₂.",
+            "savings_kg": round(potential_savings, 2),
+            "action": "buy_less"
+        })
+    elif consumption_diff > 0 and cluster_consumption > 0:
+        consumption_ratio = consumption_diff / cluster_consumption
+        if consumption_ratio > 0.1:  # More than 10% above cluster
+            # Calculate potential savings
+            potential_inr_reduction = consumption_diff / (emission_factors['consumption'] * inr_to_usd_rate)
+            potential_savings = consumption_diff
+            
+            suggestions.append({
+                "type": "consumption",
+                "message": f"Delay non-essential purchases worth ₹{potential_inr_reduction:,.0f} to avoid {potential_savings:.1f} kg CO₂.",
+                "savings_kg": round(potential_savings, 2),
+                "action": "buy_less"
+            })
+        else:
+            suggestions.append({
+                "type": "consumption",
+                "message": "Your consumption emissions are already close to cluster average—good job!",
+                "savings_kg": 0,
+                "action": "maintain"
+            })
+    elif consumption_diff <= 0 and cluster_consumption > 0:
+        suggestions.append({
+            "type": "consumption",
+            "message": "Your consumption emissions are already below cluster average—great job!",
+            "savings_kg": 0,
+            "action": "maintain"
+        })
+    else:
+        suggestions.append({
+            "type": "consumption",
+            "message": "No consumption data available for comparison.",
+            "savings_kg": 0,
+            "action": "no_data"
+        })
+    
+    return suggestions
+
+@decorators.login_required
+def api_insights(request):
+    """
+    API endpoint that returns user insights based on ML clustering with dynamic suggestions
+    """
+    try:
+        # Extract features for the current user
+        user_features = get_user_features(request.user)
+        
+        # Prepare features for prediction (exclude user_id)
+        feature_columns = [col for col in user_features.keys() if col != 'user_id']
+        user_feature_values = [user_features[col] for col in feature_columns]
+        
+        # Convert to DataFrame for consistency with training
+        X = pd.DataFrame([user_feature_values], columns=feature_columns)
+        
+        # Handle any missing values
+        X = X.fillna(0)
+        
+        # Load the scaler and model
+        model_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'ml_models')
+        
+        scaler_path = os.path.join(model_dir, 'scaler.pkl')
+        with open(scaler_path, 'rb') as f:
+            scaler = pickle.load(f)
+        
+        kmeans_path = os.path.join(model_dir, 'kmeans.pkl')
+        with open(kmeans_path, 'rb') as f:
+            kmeans = pickle.load(f)
+        
+        # Scale the features
+        X_scaled = scaler.transform(X)
+        
+        # Predict cluster
+        cluster_id = kmeans.predict(X_scaled)[0]
+        
+        # Get cluster center for this cluster and inverse transform it
+        cluster_centers_scaled = kmeans.cluster_centers_
+        cluster_center_scaled = cluster_centers_scaled[cluster_id].reshape(1, -1)
+        cluster_center_unscaled = scaler.inverse_transform(cluster_center_scaled)
+        
+        # Convert cluster center to dictionary
+        cluster_center_dict = {}
+        for i, col in enumerate(feature_columns):
+            cluster_center_dict[col] = float(cluster_center_unscaled[0][i])
+        
+        # Generate dynamic suggestions
+        suggestions = calculate_dynamic_suggestions(user_features, cluster_center_dict, cluster_id)
+        
+        # Return JSON response
+        return JsonResponse({
+            'cluster_id': int(cluster_id),
+            'suggestions': suggestions,
+            'features': user_features,
+            'cluster_center': cluster_center_dict
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)

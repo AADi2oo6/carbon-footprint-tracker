@@ -456,7 +456,54 @@
                         <p class="insight-content">No recent local events found.</p>
                     {% endif %}
                 </div>
+                
+                <!-- KMeans Clustering Insights -->
+                <div class="insight-card cluster-card">
+                    <div class="insight-header">
+                        <span class="insight-icon">📊</span>
+                        <h3>Your Carbon Profile</h3>
+                    </div>
+                    <p class="insight-content">{{ eco_tip }}</p>
                 </div>
+                
+                <!-- Dynamic Personalized Suggestions -->
+                {% if dynamic_suggestions %}
+                    {% for suggestion in dynamic_suggestions %}
+                    <div class="insight-card suggestion-card">
+                        <div class="insight-header">
+                            <span class="insight-icon">
+                                {% if suggestion.type == "transport" %}🚗
+                                {% elif suggestion.type == "energy" %}⚡
+                                {% elif suggestion.type == "food" %}🍽️
+                                {% elif suggestion.type == "consumption" %}🛍️
+                                {% else %}💡
+                                {% endif %}
+                            </span>
+                            <h3>
+                                {% if suggestion.type == "transport" %}Transport Suggestion
+                                {% elif suggestion.type == "energy" %}Energy Suggestion
+                                {% elif suggestion.type == "food" %}Food Suggestion
+                                {% elif suggestion.type == "consumption" %}Consumption Suggestion
+                                {% else %}Eco Suggestion
+                                {% endif %}
+                            </h3>
+                        </div>
+                        <p class="insight-content">{{ suggestion.message }}</p>
+                        {% if suggestion.savings_kg > 0 %}
+                        <p class="insight-impact">Potential savings: {{ suggestion.savings_kg }} kg CO₂</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="insight-card suggestion-card">
+                    <div class="insight-header">
+                        <span class="insight-icon">💡</span>
+                        <h3>Personalized Suggestions</h3>
+                    </div>
+                    <p class="insight-content">Add more activities to get personalized carbon reduction suggestions.</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </section>
 

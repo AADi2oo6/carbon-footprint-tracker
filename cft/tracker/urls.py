@@ -25,6 +25,8 @@ urlpatterns = [
     path('community/<int:pk>/leave/', views.leave_community, name='leave-community'),
     path('challenges/', views.challenges_view, name='challenges'),
     path('challenge/<int:pk>/join/', views.join_challenge, name='join-challenge'),
-
+    
+    # API endpoints
+    path('api/insights/', views.api_insights, name='api-insights'),
 
 ]
