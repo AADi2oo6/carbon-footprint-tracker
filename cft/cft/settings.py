@@ -78,12 +78,8 @@ WSGI_APPLICATION = 'cft.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres.rmpfmxnrsochmbgjeycz',
-        'PASSWORD': '20251@Adi',  # Your database password
-        'HOST': 'aws-1-ap-southeast-2.pooler.supabase.com', # The host from your screenshot
-        'PORT': '5432', # The port from your screenshot
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
